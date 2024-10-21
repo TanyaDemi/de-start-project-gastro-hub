@@ -1,2 +1,118 @@
 /*Добавьте в этот файл комментарии по проекту, которые вы считаете необходимыми, 
 и вопросы ревьюеру*/
+
+Егор, Добрый день!
+
+Спасибо большое за проверку и комментарии.
+Внесла исправления согласно пожеланий, надеюсь все верно поняла:)
+А то я думала чего меню никуда не пристроили, а то я его проигнорила его в таблице cafe.restaurants....
+
+Добавила код в файл DDL.sql:
+/*Вариант 1. Замена кода для создания таблицы верно согласно задания с начала */
+CREATE TABLE cafe.restaurants (
+    restaurant_uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cafe_name VARCHAR(100) NOT NULL,
+    cafe_type cafe.restaurant_type NOT NULL,
+    menu_jsonb JSONB NOT NULL -- Тип данных JSONB используется для хранения меню
+);
+/*Вариант 2. Добавить колонку и заполнить данными */
+ALTER TABLE cafe.restaurants
+ADD COLUMN menu_jsonb JSONB;
+
+UPDATE cafe.restaurants r
+SET menu_jsonb = m.menu::jsonb
+FROM raw_data.menu m
+JOIN raw_data.sales s ON s.cafe_name = m.cafe_name
+WHERE r.cafe_name = m.cafe_name;
+
+Добавила код в файл INSERT.sql:
+/*Замена кода для наполнения таблицы верно согласно задания с начала */
+INSERT INTO cafe.restaurants (cafe_name, cafe_type, menu_jsonb)
+SELECT DISTINCT 
+    m.cafe_name AS cafe_name, 
+    s.type::cafe.restaurant_type AS cafe_type,
+    m.menu::jsonb AS menu_jsonb
+FROM raw_data.menu m
+JOIN raw_data.sales s ON s.cafe_name = m.cafe_name
+GROUP BY m.cafe_name, s.type, m.menu;
+
+Добавила код в файл task_4.sql
+/*Код обновлен, если таблица cafe.restaurants заполнена верно*/
+WITH top_pizzas_menu AS (
+    -- Разбираем JSON-меню и выделяем только пиццы
+    SELECT 
+        r.cafe_name,
+        COUNT(menu_items.key) AS pizza_count
+    FROM 
+        cafe.restaurants r
+        JOIN jsonb_each_text(r.menu_jsonb->'Пицца') AS menu_items ON TRUE
+    WHERE r.cafe_type = 'pizzeria'
+    GROUP BY r.cafe_name
+),
+ranked_pizzerias AS (
+    -- Ранжируем пиццерии по количеству пицц
+    SELECT
+        cafe_name,
+        pizza_count,
+        DENSE_RANK() OVER (ORDER BY pizza_count DESC) AS rank
+    FROM top_pizzas_menu
+)
+-- Выбираем пиццерии с максимальным количеством пицц
+SELECT
+    cafe_name AS "Название заведения",
+    pizza_count AS "Количество пицц в меню"
+FROM ranked_pizzerias
+WHERE rank = 1;
+
+Добавила код в файл task_6.sql
+/*Код обновлен*/
+BEGIN;
+
+-- Блокируем только строки, которые содержат капучино, для их обновления
+WITH updated_cappuccino_prices AS (
+    -- Выбираем и блокируем строки с капучино для обновления
+    SELECT 
+        r.cafe_name,
+        menu_items.key AS cappuccino_name,
+        ROUND((menu_items.value::numeric * 1.2), 2) AS new_cappuccino_price
+    FROM 
+        cafe.restaurants r
+        JOIN jsonb_each_text(r.menu_jsonb->'Кофе') AS menu_items ON TRUE
+    WHERE menu_items.key ILIKE 'Капучино'
+    -- Блокируем строки с капучино для других транзакций
+    FOR UPDATE
+)
+-- Обновляем цены на капучино, используя новые значения из CTE
+UPDATE cafe.restaurants r
+SET menu_jsonb = jsonb_set(
+    r.menu_jsonb,
+    ARRAY['Кофе', 'Капучино'],
+    to_jsonb(up.new_cappuccino_price)
+)
+FROM updated_cappuccino_prices up
+WHERE r.cafe_name = up.cafe_name;
+
+COMMIT;
+
+Обновлена диаграмма схемы cafe в файле project-gastro-hub-сhema cafe new.png
+
+
+Приятного прочтения и наилучшие пожелания!
+Татьяна.
+
+
+
+
+
+
+
+Добрый день!
+
+Прошу проверить и принять финальное задание спринта: проект "Гастро Хаб / GASTRO HUB".
+Было сложновато...
+
+Дамп развернула только локально, а то через ВПН долго подгружалась таблица sales на 204480 строк...
+Диаграмма схемы cafe добавлена в репозиторий.
+
+Приятного прочтения и наилучшие пожелания!
+Татьяна.
